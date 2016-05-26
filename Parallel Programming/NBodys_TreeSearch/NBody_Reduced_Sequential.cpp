@@ -73,19 +73,17 @@ int main(){
 		for(int	i = 0; i < N; i++){
 			double x_dif, y_dif, dist, dist_cubed;		
 			double tempForcX, tempForcY;
-			for(int j = i + 1; j < N; j++){
-				if( i != j){
-					x_dif = pos[i][X_Pos] - pos[j][X_Pos];
-					y_dif = pos[i][Y_Pos] - pos[j][Y_Pos];
-					dist = sqrt(x_dif * x_dif + y_dif * y_dif);
-					dist_cubed = dist * dist * dist;
-					tempForcX = constG * masses[i] * masses[j] / dist_cubed * x_dif;
-					tempForcY = constG * masses[i] * masses[j] / dist_cubed * y_dif;
-					forces[i][X_Pos] += tempForcX;
-					forces[i][Y_Pos] += tempForcY;				
-					forces[j][X_Pos] -= tempForcX;
-					forces[j][Y_Pos] -= tempForcY;
-				}
+			for(int j = i + 1; j < N; j++){			
+				x_dif = pos[i][X_Pos] - pos[j][X_Pos];
+				y_dif = pos[i][Y_Pos] - pos[j][Y_Pos];
+				dist = sqrt(x_dif * x_dif + y_dif * y_dif);
+				dist_cubed = dist * dist * dist;
+				tempForcX = constG * masses[i] * masses[j] / dist_cubed * x_dif;
+				tempForcY = constG * masses[i] * masses[j] / dist_cubed * y_dif;
+				forces[i][X_Pos] += tempForcX;
+				forces[i][Y_Pos] += tempForcY;				
+				forces[j][X_Pos] -= tempForcX;
+				forces[j][Y_Pos] -= tempForcY;				
 			}
 		}		
 		
