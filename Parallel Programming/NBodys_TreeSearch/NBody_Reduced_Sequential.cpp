@@ -18,7 +18,7 @@
 #define Y_Pos 1
 
 double forces[N][2], pos[N][2], vel[N][2]; // vectors 2-dimensions
-double masses[N]; // mass is constant just for this example
+double masses[N]; // mass is constant just for thi	s example
 
 double gRanNum(double min, double max){
 	double res = (max -  min) * ((double)rand() / (double)RAND_MAX) + min;
@@ -83,7 +83,7 @@ int main(){
 				forces[i][X_Pos] += tempForcX;
 				forces[i][Y_Pos] += tempForcY;				
 				forces[j][X_Pos] -= tempForcX;
-				forces[j][Y_Pos] -= tempForcY;				
+				forces[j][Y_Pos] -= tempForcY;			
 			}
 		}		
 		

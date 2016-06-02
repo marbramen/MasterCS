@@ -18,9 +18,14 @@
 #define X_Pos 0
 #define Y_Pos 1
 
+int timeFinal = 100, difT = 1;
+double constG = 6.673E-3; // 6.673E-11 real value for constant gravity, but is very small almost zero 
 double forces[N][2], pos[N][2], vel[N][2]; // vectors 2-dimensions
 double loc_forces[NUM_THREADS][N][2]; // for the forces calculates for each thread
 double masses[N]; // mass is constant just for this example
+
+// array of locks
+omp_lock_t locks[N];
 
 double gRanNum(double min, double max){
 	double res = (max -  min) * ((double)rand() / (double)RAND_MAX) + min;
@@ -43,23 +48,156 @@ void initArrays(){
 	memset(loc_forces, 0, sizeof(loc_forces));
 }
 
+void initArrayLocks(){
+		for(int i = 0; i < N; i++)
+				omp_init_lock(&(locks[i]));
+}
+
 void prVecMss(){
 	for(int i = 0; i < N; i++)
 		printf("Particle %d: Pos(%lf, %lf) Force(%lf, %lf) Velo(%lf, %lf) Mass(%lf)\n", 
 		i + 1, pos[i][X_Pos], pos[i][Y_Pos], forces[i][X_Pos], forces[i][Y_Pos], vel[i][X_Pos], vel[i][Y_Pos], masses[i]); 
 }
 
+void multWithLoc_Forces_WithBlocking(){
+	#pragma omp for schedule(static, N / NUM_THREADS)
+	for(int	i = 0; i < N; i++){
+		double x_dif, y_dif, dist, dist_cubed;		
+		double tempForcX, tempForcY;
+		int myRank = omp_get_thread_num();
+		for(int j = i + 1; j < N; j++){			
+			x_dif = pos[i][X_Pos] - pos[j][X_Pos];
+			y_dif = pos[i][Y_Pos] - pos[j][Y_Pos];
+			dist = sqrt(x_dif * x_dif + y_dif * y_dif);
+			dist_cubed = dist * dist * dist;				
+			tempForcX = constG * masses[i] * masses[j] / dist_cubed * x_dif;
+			tempForcY = constG * masses[i] * masses[j] / dist_cubed * y_dif;
+
+			loc_forces[myRank][i][X_Pos] += tempForcX;
+			loc_forces[myRank][i][Y_Pos] += tempForcY;				
+			loc_forces[myRank][j][X_Pos] -= tempForcX;
+			loc_forces[myRank][j][Y_Pos] -= tempForcY;				
+		}
+	}		
+}
+
+void multWithLoc_Forces_WithCiclic(){
+	#pragma omp for 	
+	for(int	i = 0; i < N; i++){
+		double x_dif, y_dif, dist, dist_cubed;		
+		double tempForcX, tempForcY;
+		int myRank = omp_get_thread_num();
+		for(int j = i + 1; j < N; j++){			
+			x_dif = pos[i][X_Pos] - pos[j][X_Pos];
+			y_dif = pos[i][Y_Pos] - pos[j][Y_Pos];
+			dist = sqrt(x_dif * x_dif + y_dif * y_dif);
+			dist_cubed = dist * dist * dist;				
+			tempForcX = constG * masses[i] * masses[j] / dist_cubed * x_dif;
+			tempForcY = constG * masses[i] * masses[j] / dist_cubed * y_dif;
+
+			loc_forces[myRank][i][X_Pos] += tempForcX;
+			loc_forces[myRank][i][Y_Pos] += tempForcY;				
+			loc_forces[myRank][j][X_Pos] -= tempForcX;
+			loc_forces[myRank][j][Y_Pos] -= tempForcY;				
+		}
+	}
+}
+
+
+void multWithLoc_Forces(){
+	#pragma omp for schedule(static, N / NUM_THREADS)
+	for(int j = 0; j < NUM_THREADS; j++){
+		for(int i = 0; i < N; i++){
+			loc_forces[j][i][X_Pos] = 0;
+			loc_forces[j][i][Y_Pos] = 0;
+		}
+	}
+		
+	//FIRST PHASE 
+	multWithLoc_Forces_WithCiclic();
+
+	//SECOND PHASE - no matter if partition block
+	#pragma omp for schedule(static, N / NUM_THREADS)	
+	for(int i = 0; i < N; i++){
+		forces[i][X_Pos] = 0;
+		forces[i][Y_Pos] = 0;
+		for(int j = 0; j < NUM_THREADS; j++){
+			forces[i][X_Pos] += loc_forces[j][i][X_Pos];
+			forces[i][Y_Pos] += loc_forces[j][i][Y_Pos];
+		}
+	}	
+}
+
+void multWith_CriticalSection(){
+	#pragma omp for schedule(static, N / NUM_THREADS)
+	for(int i = 0; i < N; i++){
+		forces[i][X_Pos] = 0;
+		forces[i][Y_Pos] = 0;
+	}
+		
+	#pragma omp for schedule(static, N / NUM_THREADS)	
+	for(int	i = 0; i < N; i++){
+		double x_dif, y_dif, dist, dist_cubed;		
+		double tempForcX, tempForcY;
+		for(int j = i + 1; j < N; j++){			
+			x_dif = pos[i][X_Pos] - pos[j][X_Pos];
+			y_dif = pos[i][Y_Pos] - pos[j][Y_Pos];
+			dist = sqrt(x_dif * x_dif + y_dif * y_dif);
+			dist_cubed = dist * dist * dist;
+			tempForcX = constG * masses[i] * masses[j] / dist_cubed * x_dif;
+			tempForcY = constG * masses[i] * masses[j] / dist_cubed * y_dif;				
+			#pragma omp critical 
+			{			
+				forces[i][X_Pos] += tempForcX;
+				forces[i][Y_Pos] += tempForcY;				
+				forces[j][X_Pos] -= tempForcX;
+				forces[j][Y_Pos] -= tempForcY;			
+			}	
+		}
+	}			
+}
+
+void multWith_LockedArrays(){
+	#pragma omp for schedule(static, N / NUM_THREADS)
+	for(int i = 0; i < N; i++){
+		forces[i][X_Pos] = 0;
+		forces[i][Y_Pos] = 0;
+	}
+
+	#pragma omp for schedule(static, N / NUM_THREADS)
+	for(int	i = 0; i < N; i++){
+		double x_dif, y_dif, dist, dist_cubed;		
+		double tempForcX, tempForcY;
+		for(int j = i + 1; j < N; j++){			
+			x_dif = pos[i][X_Pos] - pos[j][X_Pos];
+			y_dif = pos[i][Y_Pos] - pos[j][Y_Pos];
+			dist = sqrt(x_dif * x_dif + y_dif * y_dif);
+			dist_cubed = dist * dist * dist;
+			tempForcX = constG * masses[i] * masses[j] / dist_cubed * x_dif;
+			tempForcY = constG * masses[i] * masses[j] / dist_cubed * y_dif;
+			
+			omp_set_lock(&locks[i]);					
+			forces[i][X_Pos] += tempForcX;
+			forces[i][Y_Pos] += tempForcY;
+			omp_unset_lock(&locks[i]);
+
+			omp_set_lock(&locks[j]);
+			forces[j][X_Pos] -= tempForcX;
+			forces[j][Y_Pos] -= tempForcY;			
+			omp_unset_lock(&locks[j]);				
+		}
+	}		
+}
+
+
 int main(){
 	initArrays();		
 	printf("Data created\n");
-	//prVecMss();
-	int timeFinal = 100, difT = 1;
-	double constG = 6.673E-3; // 6.673E-11 real value for constant gravity, but is very small almost zero 
-
 	omp_set_num_threads(NUM_THREADS);
 
-	clock_t time = clock();	
+	initArrayLocks();
 
+	clock_t time = clock();	
 	#pragma omp parallel 
 	for(int currTime = 0; currTime <= timeFinal; currTime += difT){
 		
@@ -74,46 +212,10 @@ int main(){
 			}
 		}	
 		
-		#pragma omp for schedule(static, N / NUM_THREADS)
-		for(int j = 0; j < NUM_THREADS; j++){
-			for(int i = 0; i < N; i++){
-				loc_forces[j][i][X_Pos] = 0;
-				loc_forces[j][i][Y_Pos] = 0;
-			}
-		}
-
-		//FIRST PHASE - form ciclic partition
-		#pragma omp for
-		for(int	i = 0; i < N; i++){
-			double x_dif, y_dif, dist, dist_cubed;		
-			double tempForcX, tempForcY;
-			int myRank = omp_get_thread_num();
-			for(int j = i + 1; j < N; j++){			
-				x_dif = pos[i][X_Pos] - pos[j][X_Pos];
-				y_dif = pos[i][Y_Pos] - pos[j][Y_Pos];
-				dist = sqrt(x_dif * x_dif + y_dif * y_dif);
-				dist_cubed = dist * dist * dist;				
-				tempForcX = constG * masses[i] * masses[j] / dist_cubed * x_dif;
-				tempForcY = constG * masses[i] * masses[j] / dist_cubed * y_dif;
-
-				loc_forces[myRank][i][X_Pos] += tempForcX;
-				loc_forces[myRank][i][Y_Pos] += tempForcY;				
-				loc_forces[myRank][j][X_Pos] -= tempForcX;
-				loc_forces[myRank][j][Y_Pos] -= tempForcY;				
-			}
-		}			
-		
-		//SECOND PHASE - no matter if partition block
-		#pragma omp for schedule(static, N / NUM_THREADS)
-		for(int i = 0; i < N; i++){
-			forces[i][X_Pos] = 0;
-			forces[i][Y_Pos] = 0;
-			for(int j = 0; j < NUM_THREADS; j++){
-				forces[i][X_Pos] += loc_forces[j][i][X_Pos];
-				forces[i][Y_Pos] += loc_forces[j][i][Y_Pos];
-			}
-		}
-
+		// multWith_CriticalSection();		
+		// multWith_LockedArrays();			
+		multWithLoc_Forces();
+			
 		#pragma omp for schedule(static, N / NUM_THREADS)
 		for(int i = 0; i < N; i++){
 			pos[i][X_Pos] += difT * vel[i][X_Pos];

@@ -13,12 +13,15 @@
 #include<math.h>
 
 #define NUM_PR 4 // number of processors
-#define N 1600 // number of particles
+#define N 16 // number of particles
 #define X_Pos 0
 #define Y_Pos 1
 
+int timeFinal = 100, difT = 1;
+double constG = 6.673E-3; // 6.673E-11 real value for constant gravity, but is very small almost zero 
 double forces[N][2], pos[N][2], vel[N][2]; // vectors 2-dimensions
 double masses[N]; // mass is constant just for this example
+
 
 double gRanNum(double min, double max){
 	double res = (max -  min) * ((double)rand() / (double)RAND_MAX) + min;
@@ -50,9 +53,6 @@ void prVecMss(){
 int main(){
 	initArrays();		
 	printf("Data created\n");
-	//prVecMss();
-	int timeFinal = 1000, difT = 1;
-	double constG = 6.673E-3; // 6.673E-11 real value for constant gravity, but is very small almost zero 
 
 	clock_t time = clock();	
 	for(int currTime = 0; currTime <= timeFinal; currTime += difT){
