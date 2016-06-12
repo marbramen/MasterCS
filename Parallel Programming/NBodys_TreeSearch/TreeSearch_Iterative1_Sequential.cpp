@@ -46,17 +46,16 @@ void initGraphCity(){
    }
 }
 
-void push(tipeStackCity* stack, int city){
-    tipeStackCity* tempStack = (tipeStackCity*)malloc(sizeof(tipeStackCity));
+void push(tipeStackCity** stack, int city){
+    tipeStackCity* tempStack = (tipeStackCity*)malloc(sizeof(tipeStackCity));      
     tempStack->city = city;
-    tempStack->beforeCity = stack;
-    stack = tempStack;
-    free(tempStack);
+    tempStack->beforeCity = *stack;    
+    *stack = tempStack;   
 }
 
-void pop(tipeStackCity* stack, int& city){
-    city = stack->city;
-    stack = stack->beforeCity;
+void pop(tipeStackCity** stack, int& city){    
+    city = (*stack)->city; 
+    *stack = (*stack)->beforeCity;   
 }
 
 void addCity(tipeTour* tour, int city){
@@ -110,26 +109,30 @@ void printTour(tipeTour* tour) {
          printf("%d%c", tour->cities[i], i + 1 != tour->countCities ? ' ' : '\n');   
 }
 
+
 /*==== DEPTH FIRST SEARCH FOR TRAVELING SALESPERSON PROBLEM ===*/
 void dfs(){
     int city;  
-    tipeStackCity* stack = (tipeStackCity*)malloc(tipeStackCity);
-    for(city = N-1; city > 0; city--)
-        push(stack, city);
+    tipeStackCity* stack = (tipeStackCity*)malloc(sizeof(tipeStackCity));
+    tipeTour* tour = (tipeTour*)malloc(sizeof(tipeTour));
+    bestTour.length = INF;        
+    
     while(!empty(stack)){
-        pop(stack, city);
+        pop(&stack, city);        
         if(city == NO_CITY)
             removeLastCity(tour);
         else{
-            addCity(tour, city);
+            addCity(tour, city);            
             if(tour->countCities == N){
-                if(tour->length + graphCity[city][HOME] < bestTour.length)
+                if(tour->length + graphCity[city][HOME] < bestTour.length){                              
                     updateBestTour(tour, city);      
+                }    
+                removeLastCity(tour);
             }else{
-                push(stack, NO_CITY);
-                for(int nbr = N - 1; nbr > 0; nbr--){
+                push(&stack, NO_CITY);
+                for(int nbr = N - 1; nbr > 0; nbr--){               
                     if(feasible(city, nbr, tour)){
-                        push(stack, nbr);
+                        push(&stack, nbr);
                     }
                 }
             }            
