@@ -1,0 +1,13 @@
+para ejecutar se usa el comando:
+Para ubuntu 
+>> sh runBMPImage.sh 
+
+para windows se debe compilar el programa con:
+>> g++ -Wall main.cpp BMP.h BMP.cpp -o runBMP.exe
+>> ./runBMP.exe
+
+se debe setear la carpeta de origen de las imagenes 
+en la variable  "srcInput" y en "srcOutput" para la carpeta destino
+
+se debe colocar los nombres de la imagen en el array arr[]
+
